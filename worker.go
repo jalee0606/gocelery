@@ -63,7 +63,7 @@ func (w *CeleryWorker) StartWorkerWithContext(ctx context.Context) {
 						continue
 					}
 					defer releaseResultMessage(resultMsg)
-					if w.backend == nil {
+					if true {
 						log.Printf("worker: backend is empty")
 						return
 					}
