@@ -52,6 +52,20 @@ func (cb *RedisCeleryBroker) SendCeleryMessage(message *CeleryMessage) error {
 	return nil
 }
 
+func (cb *RedisCeleryBroker) SendCeleryMessageToQueue(message *CeleryMessage, queueName string) error {
+	jsonBytes, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+	conn := cb.Get()
+	defer conn.Close()
+	_, err = conn.Do("LPUSH", queueName, jsonBytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetCeleryMessage retrieves celery message from redis queue
 func (cb *RedisCeleryBroker) GetCeleryMessage() (*CeleryMessage, error) {
 	conn := cb.Get()
