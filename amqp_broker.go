@@ -70,9 +70,50 @@ func NewAMQPConnection(host string) (*amqp.Connection, *amqp.Channel) {
 	return connection, channel
 }
 
+func NewAMQPConnectionWithQueue(host string, queue string) (*amqp.Connection, *amqp.Channel, string) {
+	connection, err := amqp.Dial(host)
+	if err != nil {
+		panic(err)
+	}
+
+	channel, err := connection.Channel()
+	if err != nil {
+		panic(err)
+	}
+	return connection, channel, queue
+}
+
 // NewAMQPCeleryBroker creates new AMQPCeleryBroker
 func NewAMQPCeleryBroker(host string) *AMQPCeleryBroker {
 	return NewAMQPCeleryBrokerByConnAndChannel(NewAMQPConnection(host))
+}
+
+// NewAMQPCeleryBroker creates new AMQPCeleryBroker
+func NewAMQPCeleryBrokerWithQueue(host string, queue string) *AMQPCeleryBroker {
+	return NewAMQPCeleryBrokerByConnAndChannelAndQueue(NewAMQPConnectionWithQueue(host, queue))
+}
+
+func NewAMQPCeleryBrokerByConnAndChannelAndQueue(conn *amqp.Connection, channel *amqp.Channel, queue string) *AMQPCeleryBroker {
+	broker := &AMQPCeleryBroker{
+		Channel:    channel,
+		Connection: conn,
+		Exchange:   NewAMQPExchange("default"),
+		Queue:      NewAMQPQueue(queue),
+		Rate:       4,
+	}
+	if err := broker.CreateExchange(); err != nil {
+		panic(err)
+	}
+	if err := broker.CreateQueue(); err != nil {
+		panic(err)
+	}
+	if err := broker.Qos(broker.Rate, 0, false); err != nil {
+		panic(err)
+	}
+	if err := broker.StartConsumingChannel(); err != nil {
+		panic(err)
+	}
+	return broker
 }
 
 // NewAMQPCeleryBrokerByConnAndChannel creates new AMQPCeleryBroker using AMQP conn and channel
