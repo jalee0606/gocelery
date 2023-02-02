@@ -240,7 +240,7 @@ func (b *AMQPCeleryBroker) SendCeleryMessageToQueue(message *CeleryMessage, queu
 	return b.Publish(
 		queueName,
 		queueName,
-		true,
+		false,
 		true,
 		publishMessage,
 	)

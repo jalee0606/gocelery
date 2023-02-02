@@ -15,6 +15,44 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+type PropertiesV2 struct {
+	CorrelationId string `json:"correlation_id"`
+	ContentType   string `json:"content_type"`
+	Encoding      string `json:"content_encoding"`
+	//Optional
+	ReplyTo string `json:"reply_to,omitempty"`
+}
+
+type BodyV2 struct {
+	args   []any
+	kwargs map[string]any
+	embed  map[string]any
+}
+
+type HeaderV2 struct {
+	Language string    `json:"lang"`
+	TaskName string    `json:"task"`
+	Id       uuid.UUID `json:"task_id"`
+	RootId   uuid.UUID `json:"root_id"`
+	ParentId uuid.UUID `json:"parent_id"`
+	Group    uuid.UUID `json:"group_id"`
+	// Optional
+	MethodName  string `json:"method_name,omitempty"`
+	AliasName   string `json:"alias_name,omitempty"`
+	Eta         string `json:"ETA,omitempty"`
+	Expires     string `json:"expires,omitempty"`
+	Retries     int    `json:"retries,omitempty"`
+	TimeLimit   string `json:"timelimit,omitempty"`
+	ArgsRepr    string `json:"argsrepr,omitempty"`
+	KwargsRepr  string `json:"kwargsrepr,omitempty"`
+	Origin      string `json:"origin,omitempty"`
+	ReplaceTask int    `json:"replaced_task_nesting,omitempty"`
+}
+
+type CeleryMessageV2 struct {
+	Body BodyV2
+}
+
 // CeleryMessage is actual message to be sent to Redis
 type CeleryMessage struct {
 	Body            string                 `json:"body"`
@@ -74,9 +112,6 @@ type CeleryProperties struct {
 	DeliveryInfo  CeleryDeliveryInfo `json:"delivery_info"`
 	DeliveryMode  int                `json:"delivery_mode"`
 	DeliveryTag   string             `json:"delivery_tag"`
-}
-
-type CeleryMessageV2 struct {
 }
 
 // CeleryDeliveryInfo represents deliveryinfo json
