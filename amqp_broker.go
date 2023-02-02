@@ -248,7 +248,7 @@ func (b *AMQPCeleryBroker) SendCeleryMessageV2(message *CeleryMessageV2, queueNa
 		queueName,
 		queueName,
 		false,
-		true,
+		false,
 		publishMessage,
 	)
 }
@@ -295,7 +295,7 @@ func (b *AMQPCeleryBroker) SendCeleryMessageToQueue(message *CeleryMessage, queu
 		queueName,
 		queueName,
 		false,
-		true,
+		false,
 		publishMessage,
 	)
 }
