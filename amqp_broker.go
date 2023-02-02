@@ -200,11 +200,6 @@ func (b *AMQPCeleryBroker) SendCeleryMessage(message *CeleryMessage) error {
 }
 
 func (b *AMQPCeleryBroker) SendCeleryMessageToQueue(message *CeleryMessage, queueName string) error {
-	message.Properties.DeliveryInfo = CeleryDeliveryInfo{
-		Priority:   255,
-		Exchange:   queueName,
-		RoutingKey: queueName,
-	}
 	taskMessage := message.GetTaskMessage()
 	_, err := b.QueueDeclare(
 		queueName, // name
@@ -246,7 +241,7 @@ func (b *AMQPCeleryBroker) SendCeleryMessageToQueue(message *CeleryMessage, queu
 		queueName,
 		queueName,
 		false,
-		true,
+		false,
 		publishMessage,
 	)
 }
