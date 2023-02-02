@@ -37,6 +37,13 @@ func NewRedisCeleryBroker(uri string) *RedisCeleryBroker {
 	}
 }
 
+// SendCeleryMessageV2 send Protocol v2 Celery Message
+//
+// Not implemented in Redis
+func (cb *RedisCeleryBroker) SendCeleryMessageV2(*CeleryMessageV2, string) error {
+	return nil
+}
+
 // SendCeleryMessage sends CeleryMessage to redis queue
 func (cb *RedisCeleryBroker) SendCeleryMessage(message *CeleryMessage) error {
 	jsonBytes, err := json.Marshal(message)

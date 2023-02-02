@@ -5,8 +5,12 @@
 package gocelery
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
+	"strings"
 	"time"
 )
 
@@ -22,6 +26,7 @@ type CeleryBroker interface {
 	SendCeleryMessage(*CeleryMessage) error
 	SendCeleryMessageToQueue(*CeleryMessage, string) error
 	GetTaskMessage() (*TaskMessage, error) // must be non-blocking
+	SendCeleryMessageV2(*CeleryMessageV2, string) error
 }
 
 // CeleryBackend is interface for celery backend database
@@ -31,11 +36,15 @@ type CeleryBackend interface {
 }
 
 // NewCeleryClient creates new celery client
-func NewCeleryClient(broker CeleryBroker, backend CeleryBackend, numWorkers int) (*CeleryClient, error) {
+func NewCeleryClient(broker CeleryBroker, backend CeleryBackend, numWorkers int, options ...Option) (*CeleryClient, error) {
+	c := Config{}
+	for _, opt := range options {
+		opt(&c)
+	}
 	return &CeleryClient{
 		broker,
 		backend,
-		NewCeleryWorker(broker, backend, numWorkers),
+		NewCeleryWorker(broker, backend, numWorkers, &c),
 	}, nil
 }
 
@@ -77,6 +86,12 @@ func (cc *CeleryClient) DelayToQueue(task string, queueName string, args ...inte
 	return cc.delayToQueue(celeryTask, queueName)
 }
 
+func (cc *CeleryClient) DelayToQueueV2(task string, queueName string, args ...interface{}) (*AsyncResult, error) {
+	celeryTask := getTaskMessage(task)
+	celeryTask.Args = args
+	return cc.delayToQueueV2(celeryTask, queueName)
+}
+
 // DelayKwargs gets asynchronous results with argument map
 func (cc *CeleryClient) DelayKwargs(task string, args map[string]interface{}) (*AsyncResult, error) {
 	celeryTask := getTaskMessage(task)
@@ -100,6 +115,51 @@ func (cc *CeleryClient) delay(task *TaskMessage) (*AsyncResult, error) {
 	celeryMessage := getCeleryMessage(encodedMessage)
 	defer releaseCeleryMessage(celeryMessage)
 	err = cc.broker.SendCeleryMessage(celeryMessage)
+	if err != nil {
+		return nil, err
+	}
+	return &AsyncResult{
+		TaskID:  task.ID,
+		backend: cc.backend,
+	}, nil
+}
+
+func repr(args []interface{}) string {
+	b := new(bytes.Buffer)
+	b.WriteRune('(')
+	js := json.NewEncoder(b)
+	for _, obj := range args {
+		js.Encode(obj)
+		b.WriteRune(',')
+	}
+	b.Truncate(b.Len() - 2)
+	b.WriteRune(')')
+	return strings.ReplaceAll(string(b.Bytes()), "\n", "")
+}
+
+func (cc *CeleryClient) delayToQueueV2(task *TaskMessage, queue string) (*AsyncResult, error) {
+	defer releaseTaskMessage(task)
+	kwargs, err := json.Marshal(task.Kwargs)
+	header := HeaderV2{
+		Language:   "py",
+		TaskName:   task.Task,
+		Id:         task.ID,
+		RootId:     uuid.Must(uuid.NewV4()).String(),
+		Group:      uuid.Must(uuid.NewV4()).String(),
+		ParentId:   uuid.Must(uuid.NewV4()).String(),
+		Expires:    task.Expires,
+		Eta:        task.ETA,
+		Retries:    task.Retries,
+		KwargsRepr: string(kwargs),
+		ArgsRepr:   repr(task.Args),
+	}
+	body := BodyV2{
+		args:   task.Args,
+		kwargs: task.Kwargs,
+	}
+	celeryMessage := getCeleryMessageV2(header, body)
+	defer releaseCeleryMessageV2(celeryMessage)
+	err = cc.broker.SendCeleryMessageV2(celeryMessage, queue)
 	if err != nil {
 		return nil, err
 	}

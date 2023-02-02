@@ -5,10 +5,13 @@
 package gocelery
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,31 +29,32 @@ type PropertiesV2 struct {
 type BodyV2 struct {
 	args   []any
 	kwargs map[string]any
-	embed  map[string]any
 }
 
 type HeaderV2 struct {
-	Language string    `json:"lang"`
-	TaskName string    `json:"task"`
-	Id       uuid.UUID `json:"task_id"`
-	RootId   uuid.UUID `json:"root_id"`
-	ParentId uuid.UUID `json:"parent_id"`
-	Group    uuid.UUID `json:"group_id"`
+	Language string `json:"lang"`
+	TaskName string `json:"task"`
+	Id       string `json:"task_id"`
+	RootId   string `json:"root_id"`
+	ParentId string `json:"parent_id"`
+	Group    string `json:"group_id"`
 	// Optional
-	MethodName  string `json:"method_name,omitempty"`
-	AliasName   string `json:"alias_name,omitempty"`
-	Eta         string `json:"ETA,omitempty"`
-	Expires     string `json:"expires,omitempty"`
-	Retries     int    `json:"retries,omitempty"`
-	TimeLimit   string `json:"timelimit,omitempty"`
-	ArgsRepr    string `json:"argsrepr,omitempty"`
-	KwargsRepr  string `json:"kwargsrepr,omitempty"`
-	Origin      string `json:"origin,omitempty"`
-	ReplaceTask int    `json:"replaced_task_nesting,omitempty"`
+	MethodName  string     `json:"method_name,omitempty"`
+	AliasName   string     `json:"alias_name,omitempty"`
+	Eta         *string    `json:"ETA,omitempty"`
+	Expires     *time.Time `json:"expires,omitempty"`
+	Retries     int        `json:"retries,omitempty"`
+	TimeLimit   string     `json:"timelimit,omitempty"`
+	ArgsRepr    string     `json:"argsrepr,omitempty"`
+	KwargsRepr  string     `json:"kwargsrepr,omitempty"`
+	Origin      string     `json:"origin,omitempty"`
+	ReplaceTask int        `json:"replaced_task_nesting,omitempty"`
 }
 
 type CeleryMessageV2 struct {
-	Body BodyV2
+	Body       BodyV2       `json:"body"`
+	Headers    HeaderV2     `json:"headers"`
+	Properties PropertiesV2 `json:"properties"`
 }
 
 // CeleryMessage is actual message to be sent to Redis
@@ -62,12 +66,81 @@ type CeleryMessage struct {
 	ContentEncoding string                 `json:"content-encoding"`
 }
 
+const (
+	jsonV2Opt = `{"callbacks":null,"errbacks":null,"chain":null,"chord":null}`
+)
+
+func (cm *CeleryMessageV2) GetBody() (string, error) {
+	b := new(bytes.Buffer)
+	b.WriteRune('[')
+	js := json.NewEncoder(b)
+	if cm.Body.args == nil {
+		b.WriteString("[]")
+	} else if err := js.Encode(cm.Body.args); err != nil {
+		return "", fmt.Errorf("args json encode: %w", err)
+	}
+	b.WriteRune(',')
+	if cm.Body.kwargs == nil {
+		b.WriteString("{}")
+	} else if err := js.Encode(cm.Body.kwargs); err != nil {
+		return "", fmt.Errorf("kwargs json encode: %w", err)
+	}
+	b.WriteRune(',')
+	b.WriteString(jsonV2Opt)
+	b.WriteRune(']')
+	strWithoutNewLine := strings.ReplaceAll(string(b.Bytes()), "\n", "")
+	//fmt.Printf("%s\n", strWithoutNewLine)
+	return base64.StdEncoding.EncodeToString([]byte(strWithoutNewLine)), nil
+}
+
+func (cm *CeleryMessageV2) GetHeader() (map[string]interface{}, error) {
+	headers := make(map[string]interface{})
+	jsonStr, err := json.Marshal(cm.Headers)
+	if err != nil {
+		return headers, fmt.Errorf("error marshaling header: %w", err)
+	}
+	err = json.Unmarshal(jsonStr, &headers)
+	if err != nil {
+		return headers, fmt.Errorf("error unmarshaling into map: %w", err)
+	}
+	return headers, nil
+}
+
 func (cm *CeleryMessage) reset() {
 	cm.Headers = nil
 	cm.Body = ""
 	cm.Properties.CorrelationID = uuid.Must(uuid.NewV4()).String()
 	cm.Properties.ReplyTo = uuid.Must(uuid.NewV4()).String()
 	cm.Properties.DeliveryTag = uuid.Must(uuid.NewV4()).String()
+}
+
+func (cm *CeleryMessageV2) reset() {
+	cm.Headers = HeaderV2{}
+	cm.Body = BodyV2{}
+	cm.Properties = PropertiesV2{
+		CorrelationId: uuid.Must(uuid.NewV4()).String(),
+		ContentType:   "application/json",
+		Encoding:      "utf-8",
+	}
+}
+
+var celeryMessagePoolV2 = sync.Pool{
+	New: func() interface{} {
+		return &CeleryMessageV2{
+			Properties: PropertiesV2{
+				CorrelationId: uuid.Must(uuid.NewV4()).String(),
+				ContentType:   "application/json",
+				Encoding:      "utf-8",
+			},
+		}
+	},
+}
+
+func getCeleryMessageV2(header HeaderV2, body BodyV2) *CeleryMessageV2 {
+	msg := celeryMessagePoolV2.Get().(*CeleryMessageV2)
+	msg.Headers = header
+	msg.Body = body
+	return msg
 }
 
 var celeryMessagePool = sync.Pool{
@@ -102,6 +175,11 @@ func getCeleryMessage(encodedTaskMessage string) *CeleryMessage {
 func releaseCeleryMessage(v *CeleryMessage) {
 	v.reset()
 	celeryMessagePool.Put(v)
+}
+
+func releaseCeleryMessageV2(v *CeleryMessageV2) {
+	v.reset()
+	celeryMessagePoolV2.Put(v)
 }
 
 // CeleryProperties represents properties json

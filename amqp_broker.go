@@ -199,6 +199,60 @@ func (b *AMQPCeleryBroker) SendCeleryMessage(message *CeleryMessage) error {
 	)
 }
 
+func (b *AMQPCeleryBroker) SendCeleryMessageV2(message *CeleryMessageV2, queueName string) error {
+	_, err := b.QueueDeclare(
+		queueName, // name
+		true,      // durable
+		false,     // autoDelete
+		false,     // exclusive
+		false,     // noWait
+		nil,       // args
+	)
+	if err != nil {
+		return err
+	}
+	err = b.ExchangeDeclare(
+		"default",
+		"direct",
+		true,
+		true,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	base64Body, err := message.GetBody()
+	if err != nil {
+		return err
+	}
+
+	headers, err := message.GetHeader()
+	if err != nil {
+		return err
+	}
+
+	publishMessage := amqp.Publishing{
+		DeliveryMode:    amqp.Persistent,
+		Timestamp:       time.Now(),
+		ContentType:     "application/json",
+		Body:            []byte(base64Body),
+		Headers:         headers,
+		CorrelationId:   message.Properties.CorrelationId,
+		ContentEncoding: message.Properties.Encoding,
+	}
+
+	return b.Publish(
+		queueName,
+		queueName,
+		false,
+		true,
+		publishMessage,
+	)
+}
+
 func (b *AMQPCeleryBroker) SendCeleryMessageToQueue(message *CeleryMessage, queueName string) error {
 	taskMessage := message.GetTaskMessage()
 	_, err := b.QueueDeclare(
