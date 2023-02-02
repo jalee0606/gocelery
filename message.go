@@ -43,7 +43,7 @@ var celeryMessagePool = sync.Pool{
 				CorrelationID: uuid.Must(uuid.NewV4()).String(),
 				ReplyTo:       uuid.Must(uuid.NewV4()).String(),
 				DeliveryInfo: CeleryDeliveryInfo{
-					Priority:   0,
+					Priority:   255,
 					RoutingKey: "celery",
 					Exchange:   "celery",
 				},
@@ -74,6 +74,9 @@ type CeleryProperties struct {
 	DeliveryInfo  CeleryDeliveryInfo `json:"delivery_info"`
 	DeliveryMode  int                `json:"delivery_mode"`
 	DeliveryTag   string             `json:"delivery_tag"`
+}
+
+type CeleryMessageV2 struct {
 }
 
 // CeleryDeliveryInfo represents deliveryinfo json
