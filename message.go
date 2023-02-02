@@ -90,7 +90,8 @@ func (cm *CeleryMessageV2) GetBody() (string, error) {
 	b.WriteRune(']')
 	strWithoutNewLine := strings.ReplaceAll(string(b.Bytes()), "\n", "")
 	//fmt.Printf("%s\n", strWithoutNewLine)
-	return base64.StdEncoding.EncodeToString([]byte(strWithoutNewLine)), nil
+	return strWithoutNewLine, nil
+	//return base64.StdEncoding.EncodeToString([]byte(strWithoutNewLine)), nil
 }
 
 func (cm *CeleryMessageV2) GetHeader() (map[string]interface{}, error) {
