@@ -34,14 +34,14 @@ type BodyV2 struct {
 type HeaderV2 struct {
 	Language string `json:"lang"`
 	TaskName string `json:"task"`
-	Id       string `json:"task_id"`
+	Id       string `json:"id"`
 	RootId   string `json:"root_id"`
 	ParentId string `json:"parent_id"`
-	Group    string `json:"group_id"`
+	Group    string `json:"group"`
 	// Optional
-	MethodName  string     `json:"method_name,omitempty"`
-	AliasName   string     `json:"alias_name,omitempty"`
-	Eta         *string    `json:"ETA,omitempty"`
+	MethodName  string     `json:"meth,omitempty"`
+	AliasName   string     `json:"shadow,omitempty"`
+	Eta         *string    `json:"eta,omitempty"`
 	Expires     *time.Time `json:"expires,omitempty"`
 	Retries     int        `json:"retries,omitempty"`
 	TimeLimit   string     `json:"timelimit,omitempty"`
